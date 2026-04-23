@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word 文档高保真预览</title>
+    <script src="https://unpkg.com/jszip/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/docx-preview/dist/docx-preview.js"></script>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      #drop-zone {
+        border: 2px dashed #4a90e2;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background-color: white;
+        margin: 20px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      #drop-zone.drag-over {
+        background-color: #e3f2fd;
+        border-color: #1976d2;
+        transform: scale(1.01);
+      }
+
+      #container {
+        flex: 1;
+        overflow: auto;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+      }
+
+      /* 预览容器样式调整 */
+      .docx-wrapper {
+        background-color: transparent !important;
+        padding: 0 !important;
+      }
+
+      .docx {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        margin-bottom: 20px !important;
+      }
+
+      #loading {
+        display: none;
+        color: #4a90e2;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="drop-zone">
+      <h3>拖拽 Word 文档 (.docx) 到此处预览</h3>
+      <p>支持样式还原、表格、图片和分页</p>
+      <input type="file" id="fileInput" accept=".docx" style="display: none" />
+      <div id="loading">正在解析文档，请稍候...</div>
+    </div>
+
+    <div id="container"></div>
+
+    <script>
+      const dropZone = document.getElementById("drop-zone");
+      const container = document.getElementById("container");
+      const fileInput = document.getElementById("fileInput");
+      const loading = document.getElementById("loading");
+
+      // 点击上传
+      dropZone.addEventListener("click", () => fileInput.click());
+
+      fileInput.addEventListener("change", (e) => {
+        handleFile(e.target.files[0]);
+      });
+
+      // 拖拽处理
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("drag-over");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith(".docx")) {
+          handleFile(file);
+        } else {
+          alert("仅支持 .docx 格式的文件");
+        }
+      });
+
+      async function handleFile(file) {
+        if (!file) return;
+
+        // 清空之前的内容
+        container.innerHTML = "";
+        loading.style.display = "block";
+
+        try {
+          // docx-preview 配置项
+          const options = {
+            className: "docx", // 默认类名
+            inWrapper: true, // 是否使用库自带的包装层
+            ignoreWidth: false, // 不忽略宽度（保持原样）
+            ignoreHeight: false, // 不忽略高度
+            debug: false,
+          };
+
+          // 执行渲染
+          await docx.renderAsync(file, container, null, options);
+
+          console.log("文档渲染成功");
+        } catch (error) {
+          console.error("解析失败:", error);
+          alert("文档解析失败，请检查文件是否损坏");
+        } finally {
+          loading.style.display = "none";
+        }
+      }
+    </script>
+  </body>
+</html>
