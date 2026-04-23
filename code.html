@@ -1,0 +1,1570 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word 文档预览</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500&display=swap");
+
+      :root {
+        --bg: #0f0e0c;
+        --surface: #1a1815;
+        --surface2: #242220;
+        --border: #333028;
+        --accent: #c9a84c;
+        --accent2: #e8c96a;
+        --text: #e8e4dc;
+        --text-muted: #8a8070;
+        --paper: #faf8f4;
+        --paper-shadow: rgba(0, 0, 0, 0.6);
+        --ink: #1a1612;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Noto Sans SC", sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ── HEADER ── */
+      header {
+        border-bottom: 1px solid var(--border);
+        padding: 18px 32px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: var(--surface);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(12px);
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Noto Serif SC", serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.03em;
+        text-decoration: none;
+      }
+
+      .logo svg {
+        width: 26px;
+        height: 26px;
+      }
+
+      .header-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border);
+        margin: 0 4px;
+      }
+
+      .header-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .header-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        font-weight: 500;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      .btn-ghost:hover {
+        color: var(--text);
+        border-color: var(--text-muted);
+        background: var(--surface2);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #1a1612;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent2);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(201, 168, 76, 0.3);
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+
+      /* ── MAIN LAYOUT ── */
+      .app {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        height: calc(100vh - 61px);
+      }
+
+      /* ── SIDEBAR ── */
+      .sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        /* height:100% + overflow:hidden 确保侧边栏固定在视口内，
+       内部文件列表独立滚动，不受右侧文档区域影响 */
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+
+      .file-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+
+      .file-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s;
+        border: 1px solid transparent;
+      }
+
+      .file-item:hover {
+        background: var(--surface2);
+      }
+      .file-item.active {
+        background: rgba(201, 168, 76, 0.1);
+        border-color: rgba(201, 168, 76, 0.3);
+      }
+
+      .file-item.active .file-name {
+        color: var(--accent2);
+      }
+
+      .file-icon {
+        flex-shrink: 0;
+        opacity: 0.7;
+      }
+      .file-item.active .file-icon {
+        opacity: 1;
+      }
+
+      .file-name {
+        font-size: 13px;
+        color: var(--text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-remove {
+        margin-left: auto;
+        opacity: 0;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 15px;
+        line-height: 1;
+        transition: all 0.15s;
+      }
+
+      .file-item:hover .file-remove {
+        opacity: 1;
+      }
+      .file-remove:hover {
+        color: #e06060;
+        background: rgba(224, 96, 96, 0.1);
+      }
+
+      .upload-area {
+        margin: 8px;
+        border: 1.5px dashed var(--border);
+        border-radius: 8px;
+        padding: 20px 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .upload-area:hover,
+      .upload-area.drag-over {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(201, 168, 76, 0.05);
+      }
+
+      .upload-area svg {
+        margin-bottom: 8px;
+        opacity: 0.6;
+      }
+      .upload-area:hover svg,
+      .upload-area.drag-over svg {
+        opacity: 1;
+      }
+
+      #fileInput {
+        display: none;
+      }
+
+      /* ── TOOLBAR ── */
+      .toolbar {
+        padding: 10px 24px;
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding-right: 12px;
+        border-right: 1px solid var(--border);
+      }
+
+      .toolbar-group:last-child {
+        border-right: none;
+      }
+
+      .tool-btn {
+        padding: 6px 10px;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        font-family: inherit;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+
+      .tool-btn:hover {
+        background: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .tool-btn.active {
+        background: rgba(201, 168, 76, 0.15);
+        color: var(--accent);
+        border-color: rgba(201, 168, 76, 0.4);
+      }
+
+      .zoom-display {
+        font-size: 12px;
+        color: var(--text-muted);
+        min-width: 40px;
+        text-align: center;
+      }
+
+      .search-box {
+        display: flex;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 5px 10px;
+        gap: 6px;
+        margin-left: auto;
+      }
+
+      .search-box input {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-size: 12px;
+        font-family: inherit;
+        width: 160px;
+      }
+
+      .search-box input::placeholder {
+        color: var(--text-muted);
+      }
+
+      /* ── VIEWER ── */
+      .viewer {
+        flex: 1;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 24px;
+        background: #1c1a18;
+        background-image: radial-gradient(
+          ellipse at 50% 0%,
+          rgba(201, 168, 76, 0.04) 0%,
+          transparent 60%
+        );
+      }
+
+      /* ── EMPTY STATE ── */
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: var(--text-muted);
+        pointer-events: none;
+      }
+
+      .empty-state svg {
+        opacity: 0.25;
+      }
+
+      .empty-title {
+        font-family: "Noto Serif SC", serif;
+        font-size: 22px;
+        color: var(--text);
+        opacity: 0.4;
+      }
+
+      .empty-sub {
+        font-size: 13px;
+        opacity: 0.5;
+        letter-spacing: 0.03em;
+      }
+
+      /* ── PAPER / DOCUMENT ── */
+      .page-wrapper {
+        width: 100%;
+        max-width: 900px;
+        display: none;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .page-wrapper.visible {
+        display: flex;
+      }
+
+      .doc-page {
+        background: var(--paper);
+        color: var(--ink);
+        box-shadow:
+          0 4px 32px var(--paper-shadow),
+          0 1px 4px rgba(0, 0, 0, 0.4);
+        border-radius: 3px;
+        padding: 72px 88px;
+        min-height: 1120px;
+        transform-origin: top center;
+        transition: transform 0.2s;
+        width: 100%;
+        position: relative;
+      }
+
+      /* Document Content Styles */
+      .doc-page h1 {
+        font-family: "Noto Serif SC", serif;
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        margin-top: 32px;
+        color: #1a1612;
+        line-height: 1.4;
+        border-bottom: 2px solid #c9a84c;
+        padding-bottom: 8px;
+      }
+
+      .doc-page h1:first-child {
+        margin-top: 0;
+      }
+
+      .doc-page h2 {
+        font-family: "Noto Serif SC", serif;
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        margin-top: 28px;
+        color: #2a2018;
+      }
+
+      .doc-page h3 {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        margin-top: 22px;
+        color: #3a3028;
+      }
+
+      .doc-page h4,
+      .doc-page h5,
+      .doc-page h6 {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        margin-top: 18px;
+      }
+
+      .doc-page p {
+        font-size: 15px;
+        line-height: 1.85;
+        margin-bottom: 14px;
+        color: #2a2418;
+        text-align: justify;
+        hyphens: auto;
+      }
+
+      .doc-page ul,
+      .doc-page ol {
+        margin: 10px 0 14px 28px;
+        line-height: 1.85;
+      }
+
+      .doc-page li {
+        font-size: 15px;
+        margin-bottom: 5px;
+        color: #2a2418;
+      }
+
+      .doc-page table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+        font-size: 14px;
+      }
+
+      .doc-page table th {
+        background: #f0ebe0;
+        font-weight: 600;
+        text-align: left;
+        padding: 10px 14px;
+        border: 1px solid #d8d0c0;
+        color: #1a1612;
+      }
+
+      .doc-page table td {
+        padding: 9px 14px;
+        border: 1px solid #e0d8c8;
+        color: #2a2418;
+        line-height: 1.6;
+      }
+
+      .doc-page table tr:nth-child(even) td {
+        background: #f7f4ee;
+      }
+
+      .doc-page img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 16px auto;
+        border-radius: 2px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .doc-page a {
+        color: #8b6914;
+        text-decoration: underline;
+      }
+
+      .doc-page strong {
+        font-weight: 700;
+        color: #1a1612;
+      }
+
+      .doc-page em {
+        font-style: italic;
+      }
+
+      .doc-page blockquote {
+        border-left: 3px solid #c9a84c;
+        margin: 16px 0;
+        padding: 8px 20px;
+        background: #f5f0e4;
+        color: #4a4030;
+        font-style: italic;
+      }
+
+      .doc-page code {
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        background: #f0ebe0;
+        padding: 2px 5px;
+        border-radius: 3px;
+        color: #6b4c14;
+      }
+
+      .doc-page pre {
+        background: #f0ebe0;
+        padding: 14px 18px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin: 14px 0;
+        border-left: 3px solid #c9a84c;
+      }
+
+      .doc-page pre code {
+        background: none;
+        padding: 0;
+      }
+
+      /* ── LOADING & ERROR ── */
+      .status-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 14, 12, 0.75);
+        z-index: 200;
+        backdrop-filter: blur(4px);
+        display: none;
+      }
+
+      .status-overlay.visible {
+        display: flex;
+      }
+
+      .status-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 32px 40px;
+        text-align: center;
+        min-width: 260px;
+      }
+
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        margin: 0 auto 16px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .status-text {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
+
+      .error-msg {
+        background: rgba(220, 80, 60, 0.1);
+        border: 1px solid rgba(220, 80, 60, 0.3);
+        border-radius: 6px;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: #e87060;
+        margin: 12px 0;
+        display: none;
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+      }
+
+      /* ── HIGHLIGHT ── */
+      mark.search-highlight {
+        background: rgba(201, 168, 76, 0.5);
+        color: inherit;
+        border-radius: 2px;
+      }
+
+      /* ── PAGE NUMBERS ── */
+      .page-number {
+        position: absolute;
+        bottom: 28px;
+        right: 40px;
+        font-size: 11px;
+        color: #b0a890;
+        font-family: "Noto Serif SC", serif;
+      }
+
+      /* ── RESPONSIVE ── */
+      @media (max-width: 768px) {
+        .sidebar {
+          display: none;
+        }
+        .doc-page {
+          padding: 40px 28px;
+        }
+        .toolbar {
+          padding: 8px 12px;
+        }
+      }
+
+      /* ── ANIMATIONS ── */
+      .page-wrapper {
+        animation: fadeUp 0.4s ease;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .file-item {
+        animation: slideIn 0.2s ease;
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      /* ── PRINT ── */
+      @media print {
+        body,
+        .app {
+          display: block;
+          height: auto;
+        }
+        header,
+        .sidebar,
+        .toolbar {
+          display: none !important;
+        }
+        .viewer {
+          padding: 0;
+          background: white;
+          overflow: visible;
+        }
+        .doc-page {
+          box-shadow: none;
+          border-radius: 0;
+          padding: 20mm 25mm;
+          min-height: auto;
+          break-after: page;
+        }
+      }
+
+      /* ── BACK TO TOP ── */
+      /* 相对于右侧面板(.main-panel)绝对定位，悬浮在 viewer 右下角 */
+      .back-to-top {
+        position: absolute;
+        bottom: 36px;
+        right: 36px;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transform: translateY(10px);
+        transition:
+          opacity 0.25s,
+          transform 0.25s,
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s,
+          box-shadow 0.15s;
+        pointer-events: none;
+        z-index: 50;
+      }
+
+      /* ── URL LOADER ── */
+      .url-loader {
+        margin: 0 8px 0;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface2);
+      }
+
+      .url-loader-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      .url-input-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .url-input {
+        flex: 1;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--text);
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.15s;
+        min-width: 0;
+      }
+
+      .url-input::placeholder {
+        color: var(--text-muted);
+      }
+      .url-input:focus {
+        border-color: var(--accent);
+      }
+
+      .url-btn {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        background: var(--accent);
+        border: none;
+        border-radius: 5px;
+        color: #1a1612;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+      }
+
+      .url-btn:hover {
+        background: var(--accent2);
+      }
+      .url-btn:active {
+        transform: scale(0.95);
+      }
+
+      .url-btn.loading {
+        background: var(--border);
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+
+      .url-error {
+        font-size: 11px;
+        color: #e87060;
+        margin-top: 6px;
+        min-height: 0;
+        transition: all 0.2s;
+        word-break: break-all;
+      }
+
+      /* ── TOOLBAR SCROLL-TOP BTN 高亮 ── */
+      .tool-btn.scroll-top-btn:hover svg {
+        stroke: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header>
+      <div class="logo">
+        <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect
+            x="3"
+            y="2"
+            width="16"
+            height="20"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="1.5" />
+          <path
+            d="M7 8h8M7 12h8M7 16h5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round" />
+          <path
+            d="M17 15l5 5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round" />
+          <circle
+            cx="21"
+            cy="20"
+            r="2"
+            stroke="currentColor"
+            stroke-width="1.5" />
+        </svg>
+        文档预览
+      </div>
+      <div class="header-divider"></div>
+      <span class="header-sub">Word Viewer</span>
+      <div class="header-actions">
+        <button
+          class="btn btn-ghost btn-sm"
+          id="printBtn"
+          onclick="window.print()"
+          style="display: none">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9" />
+            <path
+              d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          打印
+        </button>
+        <button
+          class="btn btn-primary btn-sm"
+          onclick="document.getElementById('fileInput').click()">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          上传文档
+        </button>
+      </div>
+    </header>
+
+    <div class="app">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-header">已加载文件</div>
+        <div class="file-list" id="fileList">
+          <!-- files appear here -->
+        </div>
+        <!-- URL LOADER -->
+        <div class="url-loader">
+          <div class="url-loader-label">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round">
+              <path
+                d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path
+                d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            通过链接加载
+          </div>
+          <div class="url-input-row">
+            <input
+              type="text"
+              id="urlInput"
+              class="url-input"
+              placeholder="粘贴 .docx 文件链接…"
+              onkeydown="if (event.key === 'Enter') loadFromUrl();" />
+            <button class="url-btn" onclick="loadFromUrl()" title="加载">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+          <div id="urlError" class="url-error"></div>
+        </div>
+
+        <div class="upload-area" id="dropZone">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            display="block"
+            style="margin: 0 auto 8px">
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="12" y1="18" x2="12" y2="12" />
+            <line x1="9" y1="15" x2="15" y2="15" />
+          </svg>
+          拖放 .docx 文件到这里<br />或点击上传
+        </div>
+      </aside>
+
+      <!-- MAIN PANEL -->
+      <div
+        class="main-panel"
+        style="
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          position: relative;
+        ">
+        <!-- TOOLBAR -->
+        <div class="toolbar" id="toolbar" style="display: none">
+          <div class="toolbar-group">
+            <button class="tool-btn" onclick="zoom(-10)">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="8" y1="11" x2="14" y2="11" />
+              </svg>
+            </button>
+            <span class="zoom-display" id="zoomDisplay">100%</span>
+            <button class="tool-btn" onclick="zoom(10)">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="11" y1="8" x2="11" y2="14" />
+                <line x1="8" y1="11" x2="14" y2="11" />
+              </svg>
+            </button>
+            <button class="tool-btn" onclick="resetZoom()">适合</button>
+          </div>
+          <div class="toolbar-group">
+            <button
+              class="tool-btn"
+              onclick="scrollToTop()"
+              title="回到顶部 (Home)">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+                <line x1="5" y1="20" x2="19" y2="20" />
+              </svg>
+              回顶部
+            </button>
+          </div>
+          <div class="toolbar-group" id="infoBar">
+            <span
+              style="font-size: 12px; color: var(--text-muted)"
+              id="docInfo"></span>
+          </div>
+          <div class="search-box">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              style="color: var(--text-muted); flex-shrink: 0">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="在文档中搜索…"
+              oninput="searchDoc(this.value)" />
+            <span
+              id="matchCount"
+              style="
+                font-size: 11px;
+                color: var(--text-muted);
+                white-space: nowrap;
+                display: none;
+              "></span>
+          </div>
+        </div>
+
+        <!-- VIEWER -->
+        <div class="viewer" id="viewer">
+          <!-- EMPTY STATE -->
+          <div class="empty-state" id="emptyState">
+            <svg
+              width="80"
+              height="80"
+              viewBox="0 0 80 80"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <rect
+                x="16"
+                y="8"
+                width="40"
+                height="52"
+                rx="4"
+                stroke="currentColor"
+                stroke-width="2.5" />
+              <path
+                d="M28 24h24M28 34h24M28 44h16"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round" />
+              <circle
+                cx="58"
+                cy="58"
+                r="14"
+                fill="var(--surface)"
+                stroke="currentColor"
+                stroke-width="2.5" />
+              <path
+                d="M53 58h10M58 53v10"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round" />
+            </svg>
+            <div class="empty-title">暂无文档</div>
+            <div class="empty-sub">上传 .docx 文件开始预览</div>
+          </div>
+
+          <!-- PAGE WRAPPER -->
+          <div class="page-wrapper" id="pageWrapper">
+            <div class="doc-page" id="docContent"></div>
+            <div id="errorMsg" class="error-msg"></div>
+          </div>
+        </div>
+
+        <!-- BACK TO TOP -->
+        <button
+          class="back-to-top"
+          id="backToTop"
+          title="回到顶部（Home 键）"
+          onclick="scrollToTop()">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div class="status-overlay" id="loadingOverlay">
+      <div class="status-card">
+        <div class="spinner"></div>
+        <div style="font-size: 15px; color: var(--text)">正在解析文档</div>
+        <div class="status-text" id="loadingSubText">加载中…</div>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".docx" multiple />
+
+    <script>
+      // ── STATE ──
+      const files = [];
+      let currentIndex = -1;
+      let zoomLevel = 100;
+      let searchResults = [];
+      let searchCursor = 0;
+      let originalContent = "";
+
+      // ── ELEMENTS ──
+      const fileInput = document.getElementById("fileInput");
+      const fileList = document.getElementById("fileList");
+      const emptyState = document.getElementById("emptyState");
+      const pageWrapper = document.getElementById("pageWrapper");
+      const docContent = document.getElementById("docContent");
+      const docPage = document.querySelector(".doc-page");
+      const toolbar = document.getElementById("toolbar");
+      const zoomDisplay = document.getElementById("zoomDisplay");
+      const docInfo = document.getElementById("docInfo");
+      const errorMsg = document.getElementById("errorMsg");
+      const loading = document.getElementById("loadingOverlay");
+      const printBtn = document.getElementById("printBtn");
+      const dropZone = document.getElementById("dropZone");
+      const searchInput = document.getElementById("searchInput");
+      const matchCount = document.getElementById("matchCount");
+
+      // ── FILE INPUT ──
+      fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
+
+      // ── DROP ZONE ──
+      dropZone.addEventListener("click", () => fileInput.click());
+
+      ["dragenter", "dragover"].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropZone.classList.add("drag-over");
+        });
+        document.addEventListener(evt, (e) => e.preventDefault());
+      });
+
+      ["dragleave", "dragend"].forEach((evt) => {
+        dropZone.addEventListener(evt, () =>
+          dropZone.classList.remove("drag-over"),
+        );
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        handleFiles(e.dataTransfer.files);
+      });
+
+      document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        handleFiles(e.dataTransfer.files);
+      });
+
+      // ── HANDLE FILES ──
+      function handleFiles(filesList) {
+        const docxFiles = Array.from(filesList).filter((f) =>
+          f.name.endsWith(".docx"),
+        );
+        if (!docxFiles.length)
+          return showError("请上传 .docx 格式的 Word 文档");
+        docxFiles.forEach((file) => {
+          if (files.find((f) => f.name === file.name)) return;
+          files.push(file);
+          addFileItem(file, files.length - 1);
+        });
+        loadFile(files.length - 1);
+      }
+
+      function addFileItem(file, idx) {
+        const item = document.createElement("div");
+        item.className = "file-item";
+        item.dataset.idx = idx;
+        item.innerHTML = `
+      <svg class="file-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9a84c" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="8" y1="13" x2="16" y2="13"/>
+        <line x1="8" y1="17" x2="16" y2="17"/>
+      </svg>
+      <span class="file-name" title="${file.name}">${file.name}</span>
+      <button class="file-remove" onclick="removeFile(event,${idx})" title="移除">×</button>
+    `;
+        item.addEventListener("click", () => loadFile(idx));
+        fileList.appendChild(item);
+      }
+
+      function removeFile(e, idx) {
+        e.stopPropagation();
+        files.splice(idx, 1);
+        // Re-render list
+        fileList.innerHTML = "";
+        files.forEach((f, i) => addFileItem(f, i));
+        if (files.length === 0) {
+          showEmpty();
+        } else {
+          const newIdx = Math.min(idx, files.length - 1);
+          loadFile(newIdx);
+        }
+      }
+
+      // ── LOAD FILE ──
+      function loadFile(idx) {
+        if (idx < 0 || idx >= files.length) return;
+        currentIndex = idx;
+
+        // Update active state
+        document.querySelectorAll(".file-item").forEach((el, i) => {
+          el.classList.toggle("active", i === idx);
+        });
+
+        const file = files[idx];
+        showLoading(`解析 "${file.name}"…`);
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          mammoth
+            .convertToHtml(
+              { arrayBuffer: e.target.result },
+              {
+                convertImage: mammoth.images.imgElement((image) => {
+                  return image.read("base64").then((data) => ({
+                    src: `data:${image.contentType};base64,${data}`,
+                  }));
+                }),
+              },
+            )
+            .then((result) => {
+              originalContent = result.value;
+              docContent.innerHTML = originalContent;
+              // Add page number
+              const existing = docPage.querySelector(".page-number");
+              if (existing) existing.remove();
+              const pn = document.createElement("div");
+              pn.className = "page-number";
+              pn.textContent = "1";
+              docPage.appendChild(pn);
+
+              showPage();
+              hideLoading();
+              updateInfo(file, result.messages);
+              if (searchInput.value) searchDoc(searchInput.value);
+            })
+            .catch((err) => {
+              hideLoading();
+              showError("文档解析失败：" + err.message);
+              console.error(err);
+            });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      // ── DISPLAY STATE ──
+      function showLoading(msg) {
+        document.getElementById("loadingSubText").textContent =
+          msg || "加载中…";
+        loading.classList.add("visible");
+      }
+
+      function hideLoading() {
+        loading.classList.remove("visible");
+      }
+
+      function showPage() {
+        emptyState.style.display = "none";
+        pageWrapper.classList.add("visible");
+        toolbar.style.display = "flex";
+        printBtn.style.display = "";
+        errorMsg.style.display = "none";
+        applyZoom();
+      }
+
+      function showEmpty() {
+        emptyState.style.display = "";
+        pageWrapper.classList.remove("visible");
+        toolbar.style.display = "none";
+        printBtn.style.display = "none";
+        currentIndex = -1;
+      }
+
+      function showError(msg) {
+        errorMsg.textContent = msg;
+        errorMsg.style.display = "block";
+        setTimeout(() => (errorMsg.style.display = "none"), 5000);
+      }
+
+      function updateInfo(file, messages) {
+        const warnings = messages.filter((m) => m.type === "warning").length;
+        const size =
+          file.size < 1024 * 1024
+            ? (file.size / 1024).toFixed(1) + " KB"
+            : (file.size / 1024 / 1024).toFixed(2) + " MB";
+        const wordCount = docContent.innerText
+          .trim()
+          .replace(/\s+/g, " ")
+          .split(" ").length;
+        docInfo.textContent =
+          `${size}  ·  约 ${wordCount.toLocaleString()} 字` +
+          (warnings ? `  ·  ${warnings} 个警告` : "");
+      }
+
+      // ── ZOOM ──
+      function zoom(delta) {
+        zoomLevel = Math.min(200, Math.max(50, zoomLevel + delta));
+        applyZoom();
+      }
+
+      function resetZoom() {
+        zoomLevel = 100;
+        applyZoom();
+      }
+
+      function applyZoom() {
+        docPage.style.transform = `scale(${zoomLevel / 100})`;
+        docPage.style.marginBottom =
+          zoomLevel > 100 ? `${(zoomLevel - 100) * 8}px` : "0";
+        zoomDisplay.textContent = zoomLevel + "%";
+      }
+
+      // ── SEARCH ──
+      function searchDoc(query) {
+        // Restore original
+        docContent.innerHTML = originalContent;
+
+        if (!query.trim()) {
+          matchCount.style.display = "none";
+          return;
+        }
+
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`(${escaped})`, "gi");
+        docContent.innerHTML = docContent.innerHTML.replace(
+          /(<[^>]+>)|([^<]+)/g,
+          (_, tag, text) =>
+            tag
+              ? tag
+              : text.replace(regex, '<mark class="search-highlight">$1</mark>'),
+        );
+
+        const hits = docContent.querySelectorAll(
+          "mark.search-highlight",
+        ).length;
+        matchCount.style.display = "";
+        matchCount.textContent = hits ? `${hits} 处匹配` : "无匹配";
+
+        if (hits) {
+          const first = docContent.querySelector("mark.search-highlight");
+          first.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+
+      // ── KEYBOARD SHORTCUTS ──
+      document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "=") {
+          e.preventDefault();
+          zoom(10);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+          e.preventDefault();
+          zoom(-10);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+          e.preventDefault();
+          resetZoom();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+          e.preventDefault();
+          fileInput.click();
+        }
+        if (
+          e.key === "Home" &&
+          !e.ctrlKey &&
+          document.activeElement.tagName !== "INPUT"
+        ) {
+          e.preventDefault();
+          scrollToTop();
+        }
+      });
+
+      // ── LOAD FROM URL ──
+      async function loadFromUrl() {
+        const urlInput = document.getElementById("urlInput");
+        const urlError = document.getElementById("urlError");
+        const urlBtn = document.querySelector(".url-btn");
+        const url = urlInput.value.trim();
+        urlError.textContent = "";
+
+        if (!url) {
+          urlError.textContent = "请输入文件链接";
+          return;
+        }
+
+        // Basic URL validation
+        try {
+          new URL(url);
+        } catch {
+          urlError.textContent = "链接格式不正确";
+          return;
+        }
+
+        // Show loading state
+        urlBtn.classList.add("loading");
+        urlBtn.innerHTML =
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+        showLoading("正在下载文件…");
+
+        try {
+          // Try direct fetch first, fall back to CORS proxy
+          let arrayBuffer;
+          try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            arrayBuffer = await resp.arrayBuffer();
+          } catch (e) {
+            // Try CORS proxy
+            const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
+            const resp2 = await fetch(proxy);
+            if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
+            arrayBuffer = await resp2.arrayBuffer();
+          }
+
+          // Extract filename from URL
+          const urlObj = new URL(url);
+          let fname =
+            decodeURIComponent(urlObj.pathname.split("/").pop()) ||
+            "document.docx";
+          if (!fname.endsWith(".docx")) fname += ".docx";
+
+          // Parse with mammoth
+          const result = await mammoth.convertToHtml(
+            { arrayBuffer },
+            {
+              convertImage: mammoth.images.imgElement((image) =>
+                image
+                  .read("base64")
+                  .then((data) => ({
+                    src: `data:${image.contentType};base64,${data}`,
+                  })),
+              ),
+            },
+          );
+
+          originalContent = result.value;
+          docContent.innerHTML = originalContent;
+
+          // Add to sidebar
+          const urlFile = {
+            name: fname,
+            size: arrayBuffer.byteLength,
+            _url: url,
+          };
+          const existIdx = files.findIndex((f) => f._url === url);
+          if (existIdx === -1) {
+            files.push(urlFile);
+            addFileItem(urlFile, files.length - 1);
+            currentIndex = files.length - 1;
+          } else {
+            currentIndex = existIdx;
+          }
+          document.querySelectorAll(".file-item").forEach((el, i) => {
+            el.classList.toggle("active", i === currentIndex);
+          });
+
+          showPage();
+          hideLoading();
+          updateInfo(urlFile, result.messages);
+          urlInput.value = "";
+        } catch (err) {
+          hideLoading();
+          urlError.textContent = "加载失败：" + (err.message || "网络错误");
+          console.error(err);
+        } finally {
+          urlBtn.classList.remove("loading");
+          urlBtn.innerHTML =
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        }
+      }
+      // ── BACK TO TOP ──
+      const backToTop = document.getElementById("backToTop");
+      const viewer = document.getElementById("viewer");
+
+      viewer.addEventListener("scroll", () => {
+        if (viewer.scrollTop > 300) {
+          backToTop.classList.add("visible");
+        } else {
+          backToTop.classList.remove("visible");
+        }
+      });
+
+      function scrollToTop() {
+        viewer.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    </script>
+  </body>
+</html>

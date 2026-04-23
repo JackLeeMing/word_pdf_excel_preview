@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word 文件预览</title>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: #f0f2f5;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 16px 32px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      header .logo {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #2b5797, #3a7bd5);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      header h1 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1a1a1a;
+      }
+
+      .container {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        padding: 24px;
+        gap: 24px;
+        max-width: 1400px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* --- Drop Zone --- */
+      .drop-zone {
+        width: 340px;
+        min-width: 340px;
+        background: #fff;
+        border-radius: 12px;
+        border: 2px dashed #d0d5dd;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 24px;
+        transition: all 0.25s ease;
+        cursor: pointer;
+        position: relative;
+        overflow-y: auto;
+      }
+
+      .drop-zone.dragover {
+        border-color: #3a7bd5;
+        background: #eef4fd;
+        transform: scale(1.01);
+      }
+
+      .drop-zone input[type="file"] {
+        display: none;
+      }
+
+      .drop-zone .icon {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+      }
+
+      .drop-zone .icon svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .drop-zone h2 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #344054;
+        margin-bottom: 8px;
+      }
+
+      .drop-zone p {
+        font-size: 13px;
+        color: #98a2b3;
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .drop-zone p span {
+        color: #3a7bd5;
+        font-weight: 500;
+        text-decoration: underline;
+      }
+
+      .file-info {
+        margin-top: 20px;
+        padding: 12px 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+        width: 100%;
+        display: none;
+      }
+
+      .file-info.visible {
+        display: block;
+      }
+
+      .file-info .name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #344054;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .file-info .size {
+        font-size: 12px;
+        color: #98a2b3;
+        margin-top: 4px;
+      }
+
+      .error-msg {
+        margin-top: 12px;
+        padding: 10px 14px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #dc2626;
+        display: none;
+        width: 100%;
+      }
+
+      .error-msg.visible {
+        display: block;
+      }
+
+      /* --- URL Input --- */
+      .url-section {
+        width: 100%;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #f0f0f0;
+      }
+
+      .url-section label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #344054;
+        margin-bottom: 8px;
+      }
+
+      .url-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .url-row input {
+        flex: 1;
+        min-width: 0;
+        padding: 8px 12px;
+        border: 1px solid #d0d5dd;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #344054;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      .url-row input:focus {
+        border-color: #3a7bd5;
+      }
+
+      .url-row input::placeholder {
+        color: #98a2b3;
+      }
+
+      .url-row button {
+        padding: 8px 16px;
+        background: #3a7bd5;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s;
+      }
+
+      .url-row button:hover {
+        background: #2b6ec4;
+      }
+
+      .url-row button:disabled {
+        background: #a0c0ed;
+        cursor: not-allowed;
+      }
+
+      /* --- Preview Area --- */
+      .preview-panel {
+        flex: 1;
+        background: #fff;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+
+      .preview-header {
+        padding: 14px 24px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 52px;
+      }
+
+      .preview-header .title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #344054;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 6px;
+      }
+
+      .toolbar button {
+        padding: 6px 14px;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 12px;
+        color: #344054;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .toolbar button:hover {
+        background: #f5f5f5;
+      }
+
+      .preview-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 32px 40px;
+      }
+
+      .preview-body .placeholder {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #98a2b3;
+      }
+
+      .preview-body .placeholder svg {
+        width: 80px;
+        height: 80px;
+        opacity: 0.3;
+        margin-bottom: 16px;
+      }
+
+      .preview-body .placeholder p {
+        font-size: 14px;
+      }
+
+      /* Rendered docx content */
+      .preview-body .docx-content {
+        line-height: 1.8;
+        color: #1a1a1a;
+      }
+
+      .docx-content h1 {
+        font-size: 26px;
+        margin: 24px 0 12px;
+        font-weight: 700;
+      }
+      .docx-content h2 {
+        font-size: 22px;
+        margin: 20px 0 10px;
+        font-weight: 700;
+      }
+      .docx-content h3 {
+        font-size: 18px;
+        margin: 16px 0 8px;
+        font-weight: 600;
+      }
+      .docx-content h4 {
+        font-size: 16px;
+        margin: 14px 0 6px;
+        font-weight: 600;
+      }
+      .docx-content p {
+        margin: 8px 0;
+        font-size: 14px;
+      }
+      .docx-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 12px 0;
+      }
+      .docx-content table td,
+      .docx-content table th {
+        border: 1px solid #d0d5dd;
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      .docx-content table th {
+        background: #f9fafb;
+        font-weight: 600;
+      }
+      .docx-content ul,
+      .docx-content ol {
+        padding-left: 24px;
+        margin: 8px 0;
+      }
+      .docx-content li {
+        margin: 4px 0;
+        font-size: 14px;
+      }
+      .docx-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 8px 0;
+        border-radius: 4px;
+      }
+      .docx-content a {
+        color: #3a7bd5;
+        text-decoration: none;
+      }
+      .docx-content a:hover {
+        text-decoration: underline;
+      }
+
+      /* Loading spinner */
+      .loading {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+
+      .loading.visible {
+        display: flex;
+      }
+
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #e0e0e0;
+        border-top-color: #3a7bd5;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading p {
+        margin-top: 14px;
+        font-size: 13px;
+        color: #98a2b3;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+          padding: 16px;
+        }
+        .drop-zone {
+          width: 100%;
+          min-width: unset;
+          min-height: 180px;
+        }
+        .preview-body {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">W</div>
+      <h1>Word 文件预览</h1>
+    </header>
+
+    <div class="container">
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".docx" />
+        <div class="icon">
+          <svg
+            viewBox="0 0 64 64"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <rect
+              x="12"
+              y="4"
+              width="40"
+              height="56"
+              rx="4"
+              stroke="#3a7bd5"
+              stroke-width="2.5"
+              fill="#eef4fd" />
+            <path
+              d="M38 4v14h14"
+              stroke="#3a7bd5"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M38 4l14 14" stroke="#3a7bd5" stroke-width="2.5" />
+            <rect
+              x="20"
+              y="28"
+              width="24"
+              height="2.5"
+              rx="1"
+              fill="#3a7bd5"
+              opacity="0.5" />
+            <rect
+              x="20"
+              y="34"
+              width="20"
+              height="2.5"
+              rx="1"
+              fill="#3a7bd5"
+              opacity="0.4" />
+            <rect
+              x="20"
+              y="40"
+              width="22"
+              height="2.5"
+              rx="1"
+              fill="#3a7bd5"
+              opacity="0.3" />
+            <rect
+              x="20"
+              y="46"
+              width="16"
+              height="2.5"
+              rx="1"
+              fill="#3a7bd5"
+              opacity="0.25" />
+          </svg>
+        </div>
+        <h2>拖拽文件到此处</h2>
+        <p>或者 <span>点击选择文件</span><br />支持 .docx 格式</p>
+
+        <div class="file-info" id="fileInfo">
+          <div class="name" id="fileName"></div>
+          <div class="size" id="fileSize"></div>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+
+        <div class="url-section" id="urlSection">
+          <label>通过链接加载</label>
+          <div class="url-row">
+            <input
+              type="text"
+              id="urlInput"
+              placeholder="输入 .docx 文件链接"
+            />
+            <button id="urlBtn" onclick="loadFromUrl()">预览</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="preview-panel">
+        <div class="preview-header">
+          <span class="title" id="previewTitle">文档预览</span>
+          <div class="toolbar" id="toolbar" style="display: none">
+            <button onclick="toggleZoom(-1)">缩小</button>
+            <button
+              id="zoomLabel"
+              style="
+                cursor: default;
+                border: none;
+                padding: 6px 8px;
+                min-width: 50px;
+                text-align: center;
+              ">
+              100%
+            </button>
+            <button onclick="toggleZoom(1)">放大</button>
+            <button onclick="scrollToTop()">回到顶部</button>
+            <button onclick="printPreview()">打印</button>
+          </div>
+        </div>
+        <div class="preview-body" id="previewBody">
+          <div class="placeholder" id="placeholder">
+            <svg
+              viewBox="0 0 80 80"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <rect
+                x="16"
+                y="8"
+                width="48"
+                height="64"
+                rx="4"
+                stroke="#98a2b3"
+                stroke-width="2" />
+              <rect x="24" y="24" width="32" height="3" rx="1" fill="#d0d5dd" />
+              <rect x="24" y="32" width="28" height="3" rx="1" fill="#d0d5dd" />
+              <rect x="24" y="40" width="30" height="3" rx="1" fill="#d0d5dd" />
+              <rect x="24" y="48" width="20" height="3" rx="1" fill="#d0d5dd" />
+            </svg>
+            <p>拖入或选择 .docx 文件开始预览</p>
+          </div>
+          <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在解析文档…</p>
+          </div>
+          <div
+            class="docx-content"
+            id="docxContent"
+            style="display: none"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const dropZone = document.getElementById("dropZone");
+      const fileInput = document.getElementById("fileInput");
+      const fileInfo = document.getElementById("fileInfo");
+      const fileName = document.getElementById("fileName");
+      const fileSize = document.getElementById("fileSize");
+      const errorMsg = document.getElementById("errorMsg");
+      const previewBody = document.getElementById("previewBody");
+      const previewTitle = document.getElementById("previewTitle");
+      const placeholder = document.getElementById("placeholder");
+      const loading = document.getElementById("loading");
+      const docxContent = document.getElementById("docxContent");
+      const toolbar = document.getElementById("toolbar");
+      const zoomLabel = document.getElementById("zoomLabel");
+
+      let currentZoom = 100;
+
+      // --- Drop Zone Events ---
+      dropZone.addEventListener("click", () => fileInput.click());
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFile(files[0]);
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+      });
+
+      // --- Handle File ---
+      function handleFile(file) {
+        console.error(file);
+        hideError();
+
+        if (!file.name.toLowerCase().endsWith(".docx")) {
+          showError("仅支持 .docx 格式文件，请重新选择。");
+          return;
+        }
+
+        // Show file info
+        fileName.textContent = file.name;
+        fileSize.textContent = formatSize(file.size);
+        fileInfo.classList.add("visible");
+
+        // Parse
+        showLoading(true);
+        previewTitle.textContent = file.name;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const arrayBuffer = e.target.result;
+
+            const result = await mammoth.convertToHtml(
+              { arrayBuffer },
+              {
+                convertImage: mammoth.images.imgElement(function (image) {
+                  return image.read("base64then").then(function (imageBuffer) {
+                    return {
+                      src:
+                        "data:" + image.contentType + ";base64," + imageBuffer,
+                    };
+                  });
+                }),
+              },
+            );
+
+            docxContent.innerHTML = result.value;
+
+            if (result.messages.length > 0) {
+              console.warn("Mammoth warnings:", result.messages);
+            }
+
+            showLoading(false);
+            placeholder.style.display = "none";
+            docxContent.style.display = "block";
+            toolbar.style.display = "flex";
+            currentZoom = 100;
+            zoomLabel.textContent = "100%";
+            docxContent.style.fontSize = "";
+          } catch (err) {
+            showLoading(false);
+            showError("文档解析失败: " + err.message);
+            console.error(err);
+          }
+        };
+
+        reader.onerror = () => {
+          showLoading(false);
+          showError("文件读取失败，请重试。");
+        };
+
+        reader.readAsArrayBuffer(file);
+      }
+
+      // --- Zoom ---
+      function toggleZoom(dir) {
+        currentZoom = Math.min(200, Math.max(50, currentZoom + dir * 10));
+        zoomLabel.textContent = currentZoom + "%";
+        docxContent.style.fontSize = (14 * currentZoom) / 100 + "px";
+      }
+
+      // --- Scroll to Top ---
+      function scrollToTop() {
+        previewBody.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      // --- Print ---
+      function printPreview() {
+        var html = [
+          "<html><head><title>" + previewTitle.textContent + "</title>",
+          "<style>",
+          "body{font-family:-apple-system,sans-serif;padding:40px;line-height:1.8;color:#1a1a1a}",
+          "h1{font-size:24px;margin:20px 0 10px}",
+          "h2{font-size:20px;margin:18px 0 8px}",
+          "h3{font-size:17px;margin:14px 0 6px}",
+          "p{margin:6px 0}",
+          "table{border-collapse:collapse;width:100%;margin:10px 0}",
+          "td,th{border:1px solid #ccc;padding:6px 10px}",
+          "img{max-width:100%}",
+          "<\/style><\/head><body>" + docxContent.innerHTML + "<\/body><\/html>",
+        ].join("");
+        var win = window.open("", "_blank");
+        win.document.write(html);
+        win.document.close();
+        win.print();
+      }
+
+      // --- Load from URL ---
+      async function loadFromUrl() {
+        var url = document.getElementById("urlInput").value.trim();
+        var btn = document.getElementById("urlBtn");
+        if (!url) {
+          showError("请输入文件链接地址。");
+          return;
+        }
+
+        hideError();
+        btn.disabled = true;
+        btn.textContent = "加载中…";
+        showLoading(true);
+        previewTitle.textContent = url.split("/").pop().split("?")[0] || "远程文档";
+
+        try {
+          var resp = await fetch(url);
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          var arrayBuffer = await resp.arrayBuffer();
+
+          var result = await mammoth.convertToHtml(
+            { arrayBuffer: arrayBuffer },
+            {
+              convertImage: mammoth.images.imgElement(function (image) {
+                return image.read("base64then").then(function (imageBuffer) {
+                  return {
+                    src:
+                      "data:" + image.contentType + ";base64," + imageBuffer,
+                  };
+                });
+              }),
+            },
+          );
+
+          docxContent.innerHTML = result.value;
+
+          if (result.messages.length > 0) {
+            console.warn("Mammoth warnings:", result.messages);
+          }
+
+          showLoading(false);
+          placeholder.style.display = "none";
+          docxContent.style.display = "block";
+          toolbar.style.display = "flex";
+          currentZoom = 100;
+          zoomLabel.textContent = "100%";
+          docxContent.style.fontSize = "";
+          previewBody.scrollTo(0, 0);
+
+          var name = url.split("/").pop().split("?")[0];
+          fileName.textContent = name || "远程文件";
+          fileSize.textContent = formatSize(arrayBuffer.byteLength);
+          fileInfo.classList.add("visible");
+        } catch (err) {
+          showLoading(false);
+          showError("加载失败: " + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "预览";
+        }
+      }
+
+      document.getElementById("urlInput").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") loadFromUrl();
+      });
+
+      // --- Helpers ---
+      function showLoading(show) {
+        loading.classList.toggle("visible", show);
+      }
+
+      function showError(msg) {
+        errorMsg.textContent = msg;
+        errorMsg.classList.add("visible");
+      }
+
+      function hideError() {
+        errorMsg.classList.remove("visible");
+      }
+
+      function formatSize(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+      }
+    </script>
+  </body>
+</html>
