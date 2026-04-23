@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Word 文件预览</title>
+    <title>文档预览</title>
     <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
       * {
         margin: 0;
@@ -308,28 +310,28 @@
       }
 
       .docx-content h1 {
-        font-size: 26px;
+        font-size: 1.86em;
         margin: 24px 0 12px;
         font-weight: 700;
       }
       .docx-content h2 {
-        font-size: 22px;
+        font-size: 1.57em;
         margin: 20px 0 10px;
         font-weight: 700;
       }
       .docx-content h3 {
-        font-size: 18px;
+        font-size: 1.29em;
         margin: 16px 0 8px;
         font-weight: 600;
       }
       .docx-content h4 {
-        font-size: 16px;
+        font-size: 1.14em;
         margin: 14px 0 6px;
         font-weight: 600;
       }
       .docx-content p {
         margin: 8px 0;
-        font-size: 14px;
+        font-size: 1em;
       }
       .docx-content table {
         border-collapse: collapse;
@@ -340,7 +342,7 @@
       .docx-content table th {
         border: 1px solid #d0d5dd;
         padding: 8px 12px;
-        font-size: 13px;
+        font-size: 0.93em;
       }
       .docx-content table th {
         background: #f9fafb;
@@ -353,7 +355,7 @@
       }
       .docx-content li {
         margin: 4px 0;
-        font-size: 14px;
+        font-size: 1em;
       }
       .docx-content img {
         max-width: 100%;
@@ -367,6 +369,77 @@
       }
       .docx-content a:hover {
         text-decoration: underline;
+      }
+
+      /* --- PDF content --- */
+      .pdf-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: 32px;
+      }
+
+      .pdf-content canvas {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* --- Excel content --- */
+      .excel-tabs {
+        display: flex;
+        gap: 2px;
+        margin-bottom: 16px;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 0;
+        flex-wrap: wrap;
+      }
+
+      .excel-tabs button {
+        padding: 8px 16px;
+        border: 1px solid transparent;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        background: transparent;
+        font-size: 13px;
+        color: #667085;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .excel-tabs button:hover {
+        background: #f5f5f5;
+      }
+
+      .excel-tabs button.active {
+        background: #fff;
+        border-color: #e0e0e0;
+        color: #3a7bd5;
+        font-weight: 600;
+        margin-bottom: -2px;
+      }
+
+      .excel-sheet-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+        color: #1a1a1a;
+      }
+
+      .excel-sheet-table td,
+      .excel-sheet-table th {
+        border: 1px solid #d0d5dd;
+        padding: 6px 10px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .excel-sheet-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
       }
 
       /* Loading spinner */
@@ -423,13 +496,13 @@
   <body>
     <header>
       <div class="logo">W</div>
-      <h1>Word 文件预览</h1>
+      <h1>文档预览</h1>
     </header>
 
     <div class="container">
       <!-- Drop Zone -->
       <div class="drop-zone" id="dropZone">
-        <input type="file" id="fileInput" accept=".docx" />
+        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx,.xls" />
         <div class="icon">
           <svg
             viewBox="0 0 64 64"
@@ -486,7 +559,7 @@
           </svg>
         </div>
         <h2>拖拽文件到此处</h2>
-        <p>或者 <span>点击选择文件</span><br />支持 .docx 格式</p>
+        <p>或者 <span>点击选择文件</span><br />支持 .docx / .pdf / .xlsx / .xls 格式</p>
 
         <div class="file-info" id="fileInfo">
           <div class="name" id="fileName"></div>
@@ -495,13 +568,13 @@
 
         <div class="error-msg" id="errorMsg"></div>
 
-        <div class="url-section" id="urlSection">
+        <div class="url-section" id="urlSection" onclick="event.stopPropagation()">
           <label>通过链接加载</label>
           <div class="url-row">
             <input
               type="text"
               id="urlInput"
-              placeholder="输入 .docx 文件链接"
+              placeholder="输入文档链接"
             />
             <button id="urlBtn" onclick="loadFromUrl()">预览</button>
           </div>
@@ -549,7 +622,7 @@
               <rect x="24" y="40" width="30" height="3" rx="1" fill="#d0d5dd" />
               <rect x="24" y="48" width="20" height="3" rx="1" fill="#d0d5dd" />
             </svg>
-            <p>拖入或选择 .docx 文件开始预览</p>
+            <p>拖入或选择文件开始预览</p>
           </div>
           <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -559,150 +632,289 @@
             class="docx-content"
             id="docxContent"
             style="display: none"></div>
+          <div
+            class="pdf-content"
+            id="pdfContent"
+            style="display: none"></div>
+          <div
+            class="excel-content"
+            id="excelContent"
+            style="display: none"></div>
         </div>
       </div>
     </div>
 
     <script>
-      const dropZone = document.getElementById("dropZone");
-      const fileInput = document.getElementById("fileInput");
-      const fileInfo = document.getElementById("fileInfo");
-      const fileName = document.getElementById("fileName");
-      const fileSize = document.getElementById("fileSize");
-      const errorMsg = document.getElementById("errorMsg");
-      const previewBody = document.getElementById("previewBody");
-      const previewTitle = document.getElementById("previewTitle");
-      const placeholder = document.getElementById("placeholder");
-      const loading = document.getElementById("loading");
-      const docxContent = document.getElementById("docxContent");
-      const toolbar = document.getElementById("toolbar");
-      const zoomLabel = document.getElementById("zoomLabel");
+      // PDF.js worker
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
-      let currentZoom = 100;
+      var dropZone = document.getElementById("dropZone");
+      var fileInput = document.getElementById("fileInput");
+      var fileInfo = document.getElementById("fileInfo");
+      var fileName = document.getElementById("fileName");
+      var fileSize = document.getElementById("fileSize");
+      var errorMsg = document.getElementById("errorMsg");
+      var previewBody = document.getElementById("previewBody");
+      var previewTitle = document.getElementById("previewTitle");
+      var placeholder = document.getElementById("placeholder");
+      var loading = document.getElementById("loading");
+      var docxContent = document.getElementById("docxContent");
+      var pdfContent = document.getElementById("pdfContent");
+      var excelContent = document.getElementById("excelContent");
+      var toolbar = document.getElementById("toolbar");
+      var zoomLabel = document.getElementById("zoomLabel");
+
+      var currentZoom = 100;
+      var currentFileType = null; // "docx" | "pdf" | "excel"
+      var pdfDoc = null; // loaded PDF document for re-render on zoom
+      var excelWorkbook = null; // loaded workbook for sheet switching
+
+      // --- File type detection ---
+      function getFileType(name) {
+        var ext = name.toLowerCase().split(".").pop().split("?")[0];
+        if (ext === "docx") return "docx";
+        if (ext === "pdf") return "pdf";
+        if (ext === "xlsx" || ext === "xls") return "excel";
+        return null;
+      }
+
+      // --- Show active content, hide others ---
+      function showContent(type) {
+        currentFileType = type;
+        docxContent.style.display = type === "docx" ? "block" : "none";
+        pdfContent.style.display = type === "pdf" ? "flex" : "none";
+        excelContent.style.display = type === "excel" ? "block" : "none";
+        placeholder.style.display = "none";
+        toolbar.style.display = "flex";
+        currentZoom = 100;
+        zoomLabel.textContent = "100%";
+        previewBody.scrollTo(0, 0);
+      }
 
       // --- Drop Zone Events ---
-      dropZone.addEventListener("click", () => fileInput.click());
+      dropZone.addEventListener("click", function () { fileInput.click(); });
 
-      dropZone.addEventListener("dragover", (e) => {
+      dropZone.addEventListener("dragover", function (e) {
         e.preventDefault();
         dropZone.classList.add("dragover");
       });
 
-      dropZone.addEventListener("dragleave", () => {
+      dropZone.addEventListener("dragleave", function () {
         dropZone.classList.remove("dragover");
       });
 
-      dropZone.addEventListener("drop", (e) => {
+      dropZone.addEventListener("drop", function (e) {
         e.preventDefault();
         dropZone.classList.remove("dragover");
-        const files = e.dataTransfer.files;
+        var files = e.dataTransfer.files;
         if (files.length > 0) handleFile(files[0]);
       });
 
-      fileInput.addEventListener("change", (e) => {
+      fileInput.addEventListener("change", function (e) {
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
       });
 
       // --- Handle File ---
       function handleFile(file) {
-        console.error(file);
         hideError();
 
-        if (!file.name.toLowerCase().endsWith(".docx")) {
-          showError("仅支持 .docx 格式文件，请重新选择。");
+        var type = getFileType(file.name);
+        if (!type) {
+          showError("不支持的格式，请选择 .docx / .pdf / .xlsx / .xls 文件。");
           return;
         }
 
-        // Show file info
         fileName.textContent = file.name;
         fileSize.textContent = formatSize(file.size);
         fileInfo.classList.add("visible");
-
-        // Parse
-        showLoading(true);
         previewTitle.textContent = file.name;
+        showLoading(true);
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const arrayBuffer = e.target.result;
-
-            const result = await mammoth.convertToHtml(
-              { arrayBuffer },
-              {
-                convertImage: mammoth.images.imgElement(function (image) {
-                  return image.read("base64then").then(function (imageBuffer) {
-                    return {
-                      src:
-                        "data:" + image.contentType + ";base64," + imageBuffer,
-                    };
-                  });
-                }),
-              },
-            );
-
-            docxContent.innerHTML = result.value;
-
-            if (result.messages.length > 0) {
-              console.warn("Mammoth warnings:", result.messages);
-            }
-
-            showLoading(false);
-            placeholder.style.display = "none";
-            docxContent.style.display = "block";
-            toolbar.style.display = "flex";
-            currentZoom = 100;
-            zoomLabel.textContent = "100%";
-            docxContent.style.fontSize = "";
-          } catch (err) {
-            showLoading(false);
-            showError("文档解析失败: " + err.message);
-            console.error(err);
-          }
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          renderByType(type, e.target.result, file.name);
         };
-
-        reader.onerror = () => {
+        reader.onerror = function () {
           showLoading(false);
           showError("文件读取失败，请重试。");
         };
-
         reader.readAsArrayBuffer(file);
       }
 
-      // --- Zoom ---
+      // --- Render dispatcher ---
+      function renderByType(type, arrayBuffer, name) {
+        if (type === "docx") renderDocx(arrayBuffer);
+        else if (type === "pdf") renderPdf(arrayBuffer);
+        else if (type === "excel") renderExcel(arrayBuffer);
+      }
+
+      // ==================== DOCX ====================
+      function renderDocx(arrayBuffer) {
+        mammoth
+          .convertToHtml({ arrayBuffer: arrayBuffer }, {
+            convertImage: mammoth.images.imgElement(function (image) {
+              return image.read("base64then").then(function (buf) {
+                return { src: "data:" + image.contentType + ";base64," + buf };
+              });
+            }),
+          })
+          .then(function (result) {
+            docxContent.innerHTML = result.value;
+            if (result.messages.length > 0) console.warn("Mammoth warnings:", result.messages);
+            showLoading(false);
+            showContent("docx");
+            docxContent.style.fontSize = "";
+          })
+          .catch(function (err) {
+            showLoading(false);
+            showError("文档解析失败: " + err.message);
+          });
+      }
+
+      // ==================== PDF ====================
+      function renderPdf(arrayBuffer) {
+        pdfjsLib.getDocument({ data: arrayBuffer }).promise.then(function (pdf) {
+          pdfDoc = pdf;
+          pdfContent.innerHTML = "";
+          renderPdfPages(pdf, currentZoom);
+        }).catch(function (err) {
+          showLoading(false);
+          showError("PDF 解析失败: " + err.message);
+        });
+      }
+
+      function renderPdfPages(pdf, zoomPercent) {
+        var scale = (zoomPercent / 100) * 1.5;
+        var totalPages = pdf.numPages;
+        var rendered = 0;
+
+        pdfContent.innerHTML = "";
+        showLoading(true);
+
+        // render pages sequentially to keep order
+        function renderPage(pageNum) {
+          if (pageNum > totalPages) {
+            showLoading(false);
+            showContent("pdf");
+            return;
+          }
+          pdf.getPage(pageNum).then(function (page) {
+            var viewport = page.getViewport({ scale: scale });
+            var canvas = document.createElement("canvas");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            var ctx = canvas.getContext("2d");
+            page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function () {
+              pdfContent.appendChild(canvas);
+              renderPage(pageNum + 1);
+            });
+          });
+        }
+        renderPage(1);
+      }
+
+      // ==================== EXCEL ====================
+      function renderExcel(arrayBuffer) {
+        try {
+          var wb = XLSX.read(arrayBuffer, { type: "array" });
+          excelWorkbook = wb;
+          excelContent.innerHTML = "";
+
+          // tab bar
+          if (wb.SheetNames.length > 1) {
+            var tabs = document.createElement("div");
+            tabs.className = "excel-tabs";
+            wb.SheetNames.forEach(function (name, idx) {
+              var btn = document.createElement("button");
+              btn.textContent = name;
+              if (idx === 0) btn.className = "active";
+              btn.onclick = function () {
+                tabs.querySelectorAll("button").forEach(function (b) { b.className = ""; });
+                btn.className = "active";
+                renderExcelSheet(wb, name);
+              };
+              tabs.appendChild(btn);
+            });
+            excelContent.appendChild(tabs);
+          }
+
+          renderExcelSheet(wb, wb.SheetNames[0]);
+          showLoading(false);
+          showContent("excel");
+          excelContent.style.fontSize = "";
+        } catch (err) {
+          showLoading(false);
+          showError("Excel 解析失败: " + err.message);
+        }
+      }
+
+      function renderExcelSheet(wb, sheetName) {
+        // remove old table if any
+        var old = excelContent.querySelector(".excel-sheet-table");
+        if (old) old.remove();
+
+        var sheet = wb.Sheets[sheetName];
+        var html = XLSX.utils.sheet_to_html(sheet, { id: "excel-table" });
+        var container = document.createElement("div");
+        container.innerHTML = html;
+        var table = container.querySelector("table");
+        if (table) table.className = "excel-sheet-table";
+        excelContent.appendChild(table || container);
+      }
+
+      // ==================== Zoom ====================
       function toggleZoom(dir) {
         currentZoom = Math.min(200, Math.max(50, currentZoom + dir * 10));
         zoomLabel.textContent = currentZoom + "%";
-        docxContent.style.fontSize = (14 * currentZoom) / 100 + "px";
+
+        if (currentFileType === "docx") {
+          docxContent.style.fontSize = (14 * currentZoom) / 100 + "px";
+        } else if (currentFileType === "pdf" && pdfDoc) {
+          renderPdfPages(pdfDoc, currentZoom);
+        } else if (currentFileType === "excel") {
+          excelContent.style.fontSize = (13 * currentZoom) / 100 + "px";
+        }
       }
 
-      // --- Scroll to Top ---
+      // ==================== Scroll to Top ====================
       function scrollToTop() {
         previewBody.scrollTo({ top: 0, behavior: "smooth" });
       }
 
-      // --- Print ---
+      // ==================== Print ====================
       function printPreview() {
-        var html = [
-          "<html><head><title>" + previewTitle.textContent + "</title>",
-          "<style>",
-          "body{font-family:-apple-system,sans-serif;padding:40px;line-height:1.8;color:#1a1a1a}",
-          "h1{font-size:24px;margin:20px 0 10px}",
-          "h2{font-size:20px;margin:18px 0 8px}",
-          "h3{font-size:17px;margin:14px 0 6px}",
-          "p{margin:6px 0}",
-          "table{border-collapse:collapse;width:100%;margin:10px 0}",
-          "td,th{border:1px solid #ccc;padding:6px 10px}",
-          "img{max-width:100%}",
-          "<\/style><\/head><body>" + docxContent.innerHTML + "<\/body><\/html>",
-        ].join("");
         var win = window.open("", "_blank");
-        win.document.write(html);
+
+        if (currentFileType === "pdf") {
+          var imgs = pdfContent.querySelectorAll("canvas");
+          var parts = [
+            "<html><head><title>" + previewTitle.textContent + "<\/title>",
+            "<style>body{margin:0;display:flex;flex-direction:column;align-items:center}img{max-width:100%;margin:8px 0}<\/style><\/head><body>",
+          ];
+          imgs.forEach(function (c) { parts.push('<img src="' + c.toDataURL() + '">'); });
+          parts.push("<\/body><\/html>");
+          win.document.write(parts.join(""));
+        } else {
+          var content = currentFileType === "excel"
+            ? excelContent.innerHTML
+            : docxContent.innerHTML;
+          var parts = [
+            "<html><head><title>" + previewTitle.textContent + "<\/title>",
+            "<style>",
+            "body{font-family:-apple-system,sans-serif;padding:40px;line-height:1.8;color:#1a1a1a}",
+            "table{border-collapse:collapse;width:100%;margin:10px 0}",
+            "td,th{border:1px solid #ccc;padding:6px 10px}",
+            "img{max-width:100%}",
+            "<\/style><\/head><body>" + content + "<\/body><\/html>",
+          ];
+          win.document.write(parts.join(""));
+        }
         win.document.close();
         win.print();
       }
 
-      // --- Load from URL ---
+      // ==================== Load from URL ====================
       async function loadFromUrl() {
         var url = document.getElementById("urlInput").value.trim();
         var btn = document.getElementById("urlBtn");
@@ -711,50 +923,29 @@
           return;
         }
 
+        var name = url.split("/").pop().split("?")[0] || "远程文档";
+        var type = getFileType(name);
+        if (!type) {
+          showError("不支持的格式，链接需以 .docx / .pdf / .xlsx / .xls 结尾。");
+          return;
+        }
+
         hideError();
         btn.disabled = true;
         btn.textContent = "加载中…";
         showLoading(true);
-        previewTitle.textContent = url.split("/").pop().split("?")[0] || "远程文档";
+        previewTitle.textContent = name;
 
         try {
           var resp = await fetch(url);
           if (!resp.ok) throw new Error("HTTP " + resp.status);
           var arrayBuffer = await resp.arrayBuffer();
 
-          var result = await mammoth.convertToHtml(
-            { arrayBuffer: arrayBuffer },
-            {
-              convertImage: mammoth.images.imgElement(function (image) {
-                return image.read("base64then").then(function (imageBuffer) {
-                  return {
-                    src:
-                      "data:" + image.contentType + ";base64," + imageBuffer,
-                  };
-                });
-              }),
-            },
-          );
-
-          docxContent.innerHTML = result.value;
-
-          if (result.messages.length > 0) {
-            console.warn("Mammoth warnings:", result.messages);
-          }
-
-          showLoading(false);
-          placeholder.style.display = "none";
-          docxContent.style.display = "block";
-          toolbar.style.display = "flex";
-          currentZoom = 100;
-          zoomLabel.textContent = "100%";
-          docxContent.style.fontSize = "";
-          previewBody.scrollTo(0, 0);
-
-          var name = url.split("/").pop().split("?")[0];
-          fileName.textContent = name || "远程文件";
+          fileName.textContent = name;
           fileSize.textContent = formatSize(arrayBuffer.byteLength);
           fileInfo.classList.add("visible");
+
+          renderByType(type, arrayBuffer, name);
         } catch (err) {
           showLoading(false);
           showError("加载失败: " + err.message);
@@ -768,7 +959,7 @@
         if (e.key === "Enter") loadFromUrl();
       });
 
-      // --- Helpers ---
+      // ==================== Helpers ====================
       function showLoading(show) {
         loading.classList.toggle("visible", show);
       }
