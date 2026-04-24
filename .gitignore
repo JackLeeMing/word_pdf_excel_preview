@@ -42,3 +42,4 @@ vetur.config.js
 # SpecStory explanation file
 .specstory/.what-is-this.md
 .playwright-mcp/
+CLAUDE.md
