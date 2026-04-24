@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,6 +22,40 @@
         --paper: #faf8f4;
         --paper-shadow: rgba(0, 0, 0, 0.6);
         --ink: #1a1612;
+        --viewer-bg: #1c1a18;
+        --overlay-bg: rgba(15, 14, 12, 0.75);
+      }
+
+      /* ── LIGHT THEME ── */
+      [data-theme="light"] {
+        --bg: #f0ede8;
+        --surface: #ffffff;
+        --surface2: #f5f2ec;
+        --border: #ddd8cc;
+        --text: #1a1612;
+        --text-muted: #8a7860;
+        --paper: #ffffff;
+        --paper-shadow: rgba(0, 0, 0, 0.1);
+        --ink: #1a1612;
+        --viewer-bg: #e4e0d8;
+        --overlay-bg: rgba(240, 237, 232, 0.9);
+      }
+
+      /* ── AUTO THEME — light OS preference ── */
+      @media (prefers-color-scheme: light) {
+        [data-theme="auto"] {
+          --bg: #f0ede8;
+          --surface: #ffffff;
+          --surface2: #f5f2ec;
+          --border: #ddd8cc;
+          --text: #1a1612;
+          --text-muted: #8a7860;
+          --paper: #ffffff;
+          --paper-shadow: rgba(0, 0, 0, 0.1);
+          --ink: #1a1612;
+          --viewer-bg: #e4e0d8;
+          --overlay-bg: rgba(240, 237, 232, 0.9);
+        }
       }
 
       * {
@@ -359,7 +393,7 @@
         flex-direction: column;
         align-items: center;
         padding: 40px 24px;
-        background: #1c1a18;
+        background: var(--viewer-bg);
         background-image: radial-gradient(
           ellipse at 50% 0%,
           rgba(201, 168, 76, 0.04) 0%,
@@ -577,7 +611,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(15, 14, 12, 0.75);
+        background: var(--overlay-bg);
         z-index: 200;
         backdrop-filter: blur(4px);
         display: none;
@@ -979,6 +1013,13 @@
       <div class="header-divider"></div>
       <span class="header-sub">文档预览</span>
       <div class="header-actions">
+        <!-- THEME TOGGLE -->
+        <button class="btn btn-ghost btn-sm" id="themeBtn" onclick="cycleTheme()" title="切换主题">
+          <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <span id="themeLabel">暗色</span>
+        </button>
         <button
           class="btn btn-ghost btn-sm"
           id="printBtn"
@@ -1782,6 +1823,32 @@
       function scrollToTop() {
         viewer.scrollTo({ top: 0, behavior: "smooth" });
       }
+
+      // ── THEME ──
+      const THEMES = ["dark", "light", "auto"];
+      const THEME_ICONS = {
+        dark:  '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+        light: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+        auto:  '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><path d="M12 8a4 4 0 0 1 0 8V8z" fill="currentColor" stroke="none"/>',
+      };
+      const THEME_LABELS = { dark: "暗色", light: "亮色", auto: "跟随系统" };
+
+      let currentTheme = localStorage.getItem("theme") || "dark";
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        document.getElementById("themeIcon").innerHTML = THEME_ICONS[theme];
+        document.getElementById("themeLabel").textContent = THEME_LABELS[theme];
+        localStorage.setItem("theme", theme);
+        currentTheme = theme;
+      }
+
+      function cycleTheme() {
+        const next = THEMES[(THEMES.indexOf(currentTheme) + 1) % THEMES.length];
+        applyTheme(next);
+      }
+
+      applyTheme(currentTheme);
     </script>
   </body>
 </html>
